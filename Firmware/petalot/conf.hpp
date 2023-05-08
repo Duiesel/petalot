@@ -1,26 +1,17 @@
 #include <ArduinoJson.h>
 #include "FS.h"
 
-  String msg;
-  String status;
-  double To;
-  int Vo = 0;
-  int Tm;
-  double Kp;
-  double Ki;
-  double Kd;
-  double Max;
-  String LocalIP;
-  String Gateway;
-  String Subnet;
-  int R1;
-  char ssid[64];
-  char password[64];
-  String ifttt_event_name = "petalot_stopped";
-  String ifttt_api_key = "";
-  
-  StaticJsonDocument<512> doc;
 
+int Vo = 0;
+int Tm, Rd;
+uint32_t R1, R2;  // R1, R2 resistors in internal divider
+double To, Kp, Ki, Kd, Max;
+String msg, status, LocalIP, Gateway, Subnet;
+char ssid[64], password[64];
+String ifttt_event_name = "petalot_stopped";
+String ifttt_api_key = "";
+
+StaticJsonDocument<512> doc;
 
 const char *confFile = "/config.json";
 
@@ -29,8 +20,9 @@ String printConf() {
   String confString;
   serializeJson(doc, confString);
   return confString;
-  
+
 }
+
 
 void saveConfiguration() {
   SPIFFS.remove("/config.json");
@@ -51,7 +43,9 @@ void saveConfiguration() {
   doc["LocalIP"] = LocalIP;
   doc["Subnet"] = Subnet;
   doc["Gateway"] = Gateway;
+  doc["Rd"] = Rd;
   doc["R1"] = R1;
+  doc["R2"] = R2;
   doc["ifttt_event_name"] = ifttt_event_name;
   doc["ifttt_api_key"] = ifttt_api_key;
   if (serializeJson(doc, file) == 0) {
@@ -61,12 +55,12 @@ void saveConfiguration() {
   file.close();
   analogWrite(PIN_HEATER, 0);
   ESP.restart();
-  
 }
+
 
 void  resetConfiguration(){
     Serial.println("reset");
-    strcpy(ssid, "");         
+    strcpy(ssid, "");
     strcpy(password, "");
     To = 220;
     Vo = 40;
@@ -78,15 +72,18 @@ void  resetConfiguration(){
     LocalIP = "";
     Subnet = "255.255.255.0";
     Gateway = "";
-    R1 = 10000;
+    Rd = 10000;
+    R1 = 220000;
+    R2 = 100000;
     ifttt_event_name = "";
     ifttt_api_key = "";
     saveConfiguration();
 }
 
+
 void readConfigurationSerial(){
   StaticJsonDocument<512> docInput;
-  
+
   if (Serial.available() > 0)
   {
 
@@ -117,6 +114,7 @@ void readConfigurationSerial(){
   }
 }
 
+
 void loadConfiguration(bool reset=false) {
     File file = SPIFFS.open("/config.json", "r");
      if (!file) {
@@ -135,13 +133,13 @@ void loadConfiguration(bool reset=false) {
     }
     file.close();
 
-  strlcpy(ssid,                  
-          doc["ssid"] | "",  
-          sizeof(ssid));         
+  strlcpy(ssid,
+          doc["ssid"] | "",
+          sizeof(ssid));
 
-  strlcpy(password,                  
-          doc["password"] | "",  
-          sizeof(password));         
+  strlcpy(password,
+          doc["password"] | "",
+          sizeof(password));
 
   To = doc["To"] | 220;
   //To = Tco;
@@ -155,7 +153,9 @@ void loadConfiguration(bool reset=false) {
   LocalIP = doc["LocalIP"] | "";
   Subnet = doc["Subnet"] | "255.255.255.0";
   Gateway = doc["Gateway"] | "";
-  R1 = doc["R1"] | 10000;
+  Rd = doc["Rd"] | 5600;
+  R1 = doc["R1"] | 220000;
+  R2 = doc["R2"] | 100000;
   ifttt_event_name = doc["ifttt_event_name"] | "";
   ifttt_api_key = doc["ifttt_api_key"] | "";
 
@@ -166,7 +166,9 @@ void loadConfiguration(bool reset=false) {
   Serial.println("Kp:Kp");
   Serial.println("Ki:Ki");
   Serial.println("Kd:Kd");
-  Serial.println("R1:R1");
+  Serial.println("Rd:Resistor in external thermistor measure chain.");
+  Serial.println("R1:Resistor in internal Wemos board divider chain.");
+  Serial.println("R2:Resistor in internal Wemos board divider chain, connected to GND.");
   Serial.println("Max:Maximum value for MOSFET (0-255)");
   Serial.println("ssid:SSID");
   Serial.println("password:SSID Password");
@@ -176,20 +178,13 @@ void loadConfiguration(bool reset=false) {
   Serial.println("ifttt_event_name:IFTTT Event Name");
   Serial.println("ifttt_api_key:IFTTT API Key");
   Serial.println(printConf());
-
 }
 
 
-
-
 void initConf() {
-  
   if (!SPIFFS.begin()) {
     msg = "Error mounting the file system";
     return;
   }
-
   loadConfiguration();
-  
-
 }
