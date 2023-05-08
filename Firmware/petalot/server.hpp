@@ -98,7 +98,7 @@ Check your Browserslist config to be sure that your targets are set up correctly
     <div class="w-11/12 lg:w-1/2 mx-auto">
         <div class="card font-bold text-xl flex-row" href="#pablo">PETALOT <span class="text-slate-400 text-sm m-1.5">by @function.3d</span></div>
         <div class="flex flex-col sm:flex-row mx-auto items-stretch">
-          
+
             <template x-for="el in ui">
                 <div :class="el.type">
                     <div class="title" x-text="el.title"></div>
@@ -107,10 +107,10 @@ Check your Browserslist config to be sure that your targets are set up correctly
                         <label x-show="el.toggle" :for="'toggle-'+el.title" class="float-right inline-flex relative items-center cursor-pointer">
                       <input @click="fetchTele('set?'+el.value+'='+($event.target.checked?1:0))" x-model="tele[el.value]" type="checkbox" :id="'toggle-'+el.title" class="sr-only peer" >
                       <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-slate-300 dark:peer-focus:ring-slate-800 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-slate-600"></div>
-                    
+
                     </label>
                     </div>
-                    
+
                 </div>
             </template>
         </div>
@@ -122,8 +122,8 @@ Check your Browserslist config to be sure that your targets are set up correctly
                 <div   :style="'order:'+ fields[entry]['order']">
                     <div class="title" x-text="fields[entry]['title']"></div>
                     <input :tabindex="fields[entry]['order']"  class="shadow appearance-none border mb-4 rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline" x-model="conf[entry]">
-                    
-                </div>        
+
+                </div>
             </template>
             </div>
             <button x-text="save" class="bg-slate-500 hover:bg-slate-700 text-white font-bold py-2 px-4 rounded float-right" @click="fetchConf('set?'+ new URLSearchParams(conf));save='Saved!';setInterval(function(){ save='Save' }, 3000) ">
@@ -144,7 +144,7 @@ function petalot() {
             F: 0,
             status: 0,
         },
-        
+
         save:'Save',
         conf:{},
         fetchConf(url){
@@ -164,15 +164,17 @@ function petalot() {
           Kp:{order:"4",title:"Kp"},
           Ki:{order:"5",title:"Ki"},
           Kd:{order:"6",title:"Kd"},
-          R1:{order:"7",title:"R1"},
-          Max:{order:"8",title:"Maximum value for MOSFET (0-255)"},
-          ssid:{order:"9",title:"SSID"},
-          password:{order:"10",title:"SSID Password"},
-          LocalIP:{order:"11",title:"IP address"},
-          Subnet:{order:"12",title:"Subnet"},
-          Gateway:{order:"13",title:"Gateway"},
-          ifttt_event_name:{order:"14",title:"IFTTT Event Name"},
-          ifttt_api_key:{order:"15",title:"IFTTT API Key"},
+          Rd:{order:"7",title:"Rd"},
+          R1:{order:"8",title:"R1"},
+          R2:{order:"9",title:"R2"},
+          Max:{order:"10",title:"Maximum value for MOSFET (0-255)"},
+          ssid:{order:"11",title:"SSID"},
+          password:{order:"12",title:"SSID Password"},
+          LocalIP:{order:"13",title:"IP address"},
+          Subnet:{order:"14",title:"Subnet"},
+          Gateway:{order:"15",title:"Gateway"},
+          ifttt_event_name:{order:"16",title:"IFTTT Event Name"},
+          ifttt_api_key:{order:"17",title:"IFTTT API Key"},
         },
         fetchTele(url){
             fetch(url)
@@ -194,7 +196,7 @@ function petalot() {
 
 
 
-            
+
         ],
     }
 }
@@ -225,7 +227,7 @@ static const char PROGMEM INDEX_HTML_APMODE[] = R"rawliteral(
     <br><div>Gateway</div><input id="Gateway" name="Gateway">
     <br><div>subnet</div><input id="Subnet" name="Subnet">
     <br><input type="submit" value="Save">
-    </form>        
+    </form>
 </body>
 </html>
 )rawliteral";
@@ -240,6 +242,11 @@ void tele() {
   r = String("{") +
       "\"time\":" + String(millis()) +
       ",\"status\":" + (status=="working"?"true":"false") +
+      ",\"Rd\":" + String(Rd) +
+      ",\"R1\":" + String(R1) +
+      ",\"R2\":" + String(R2) +
+      ",\"adcData\":" + String(adcData) +
+      ",\"Uadc\":" + String(Uadc) +
       ",\"T\":" + String(T) +
       //",\"To\":" + String(To) +
       ",\"V\":" + String(V) +
@@ -248,22 +255,28 @@ void tele() {
       //",\"Fi\":" + String(Fi) +
       //",\"tempLastStart\":" + String(tempLastStart) +
       //",\"tempLastFilament\":" + String(tempLastFilament) +
-      ",\"Output\":" + Output +  //String(map(Output, 0, 255, 0, 100))
+      ",\"Output\":" + String(Output) +  //String(map(Output, 0, 255, 0, 100))
       //",\"msg\":\"" + msg + "\"" +
       //",\"config\":"+ printConf() +
       "}";
   server.send(200, "text/html", r);
 }
+
+
 void get(){
   server.send(200, "text/html", printConf());
 }
+
+
 void reset(){
   resetConfiguration();
 }
+
+
 void set() {
   bool save = false;
   bool reboot = false;
-  
+
   String ToChange = server.arg(String("To"));
   if (ToChange != "" && ToChange.toFloat() <= Tm && ToChange.toFloat() >= 120) {
     save = true;
@@ -312,20 +325,30 @@ void set() {
      else
       stop();
   }
+  String RdChange = server.arg(String("Rd"));
+  if (RdChange != "") {
+    save = true;
+    Rd = RdChange.toInt();
+  }
   String R1Change = server.arg(String("R1"));
   if (R1Change != "") {
     save = true;
     R1 = R1Change.toInt();
   }
+  String R2Change = server.arg(String("R2"));
+  if (R2Change != "") {
+    save = true;
+    R2 = R2Change.toInt();
+  }
   String ssidChange = server.arg(String("ssid"));
   if (ssidChange != "") {
     save = true;
-    ssidChange.toCharArray(ssid, sizeof(ssid)); 
+    ssidChange.toCharArray(ssid, sizeof(ssid));
   }
   String passwordChange = server.arg(String("password"));
   if (passwordChange != "") {
     save = true;
-    passwordChange.toCharArray(password, sizeof(password)); 
+    passwordChange.toCharArray(password, sizeof(password));
   }
   String _ifttt_event_name = server.arg(String("ifttt_event_name"));
   if (_ifttt_event_name!="") {
@@ -355,15 +378,15 @@ void set() {
     reboot = true;
     Gateway = gatewayChange;
   }
-  
-  
+
+
   if (save) {
      saveConfiguration();
      return;
   }
 
   tele();
-  
+
 }
 
 void handleRoot()
@@ -384,7 +407,7 @@ void InitServer()
   server.on("/set", set);
   server.on("/reset", reset);
   server.onNotFound([]() {
-      handleNotFound();             
+      handleNotFound();
   });
   server.enableCORS(true);
   server.begin();
